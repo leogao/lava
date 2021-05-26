@@ -89,6 +89,12 @@ def decompress_file(infile, compression):
             )
 
 
+def create_tarfile(indir, outfile):
+    tar = tarfile.open(outfile, "w")
+    tar.add("indir", filter=reset)
+    tar.close()
+
+
 def untar_file(infile, outdir):
     try:
         with tarfile.open(infile, encoding="utf-8") as tar:

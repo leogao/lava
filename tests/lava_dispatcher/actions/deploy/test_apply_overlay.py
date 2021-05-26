@@ -201,6 +201,49 @@ def test_append_overlays_update_guestfs(caplog, mocker, tmpdir):
     ]
 
 
+def test_append_lava_overlay_update_tar(caplog, mocker, tmpdir):
+    caplog.set_level(logging.DEBUG)
+    params = {"format": "tar", "overlays": {"lava": True}}
+
+    action = AppendOverlays("nfsrootfs", params)
+    action.job = Job(1234, {}, None)
+    action.parameters = {
+        "nfsrootfs": {"url": "http://example.com/rootfs.tar.gz", **params},
+        "namespace": "common",
+    }
+    action.data = {
+        "common": {
+            "compress-overlay": {"output": {"file": str(tmpdir / "overlay.tar.gz")}},
+            "download-action": {
+                "nfsrootfs": {
+                    "file": str(tmpdir / "rootfs.tar.gz"),
+                    "compression": "gz",
+                    "decompressed": False,
+                }
+            },
+        }
+    }
+    action.mkdtemp = lambda: str(tmpdir)
+    untar_file = mocker.patch("lava_dispatcher.actions.deploy.apply_overlay.untar_file")
+
+    action.update_tar()
+
+    decompress_file.assert_called_once_with(str(tmpdir / "rootfs.tar.gz"), "gz")
+    untar_file.assert_called_once_with(
+        str(tmpdir / "overlay.tar.gz"), str(tmpdir) + "/"
+    )
+    compress_file.assert_called_once_with(decompress_file(), "gz")
+
+    assert caplog.record_tuples == [
+        ("dispatcher", 20, f"Modifying '{tmpdir}/rootfs.tar.gz'"),
+        ("dispatcher", 10, "* decompressing (gz)"),
+        ("dispatcher", 10, f"* extracting {decompress_file()}"),
+        ("dispatcher", 10, "Overlays:"),
+        ("dispatcher", 10, f"- rootfs.lava: '{tmpdir}/overlay.tar.gz' to '{tmpdir}/'"),
+        ("dispatcher", 10, "* compressing (gz)"),
+    ]
+
+
 def test_append_lava_overlay_update_cpio(caplog, mocker, tmpdir):
     caplog.set_level(logging.DEBUG)
     params = {"format": "cpio.newc", "overlays": {"lava": True}}
